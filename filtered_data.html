@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Filtered Data</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        body { max-width: 700px; margin: 40px auto; font-family: sans-serif; }
+        .container { background: #fff; padding: 2em; border-radius: 8px; box-shadow: 0 2px 8px #0001; }
+        h1 { margin-top: 0; }
+        label { font-weight: bold; margin-top: 1em; display: block; }
+        select { width: 100%; padding: 0.5em; margin-bottom: 1em; border: 1px solid #ccc; border-radius: 4px; }
+        .links { margin-top: 2em; }
+        .links a { margin-right: 1.5em; color: #0074d9; text-decoration: none; font-weight: bold; }
+        .links a:hover { text-decoration: underline; }
+        .status { color: #0074d9; margin-bottom: 1em; }
+        @media print {
+            .print-hide, .links, .status { display: none !important; }
+            body, .container { box-shadow: none !important; background: #fff !important; padding: 0em; }
+            h1 {font-size:2em;}
+            h2 {font-size:1.5em;}
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="print-hide">Filtered Data</h1>
+        <div class="status print-hide" id="status">Loading...</div>
+        <div class="print-hide">
+            <label for="templateSelect">Display Template</label>
+            <select id="templateSelect">
+                <option value="template_issuesandopps">Issues & Opps</option>
+                <option value="template_recommendations">Recommendations</option>
+                <option value="template_notes">Notes</option>
+            </select>
+            <label for="fieldSelect">Filter Field</label>
+            <select id="fieldSelect">
+                <option value="">-- Select a field --</option>
+            </select>
+            <label for="valueSelect">Field Value</label>
+            <select id="valueSelect">
+                <option value="">-- Select a value --</option>
+            </select>
+        </div>
+        <h1 id="filterSummary" ></h1>
+        <div id="filteredResults"></div>
+        <div class="links print-hide">
+            <a href="bases.html">Back to Bases</a>
+            <a href="config.html">Config</a>
+            <a href="status.html">Status</a>
+        </div>
+    </div>
+    <script>
+        // For demo, get tableId and baseId from query string
+        function getQueryParam(name) {
+            const url = new URL(window.location.href);
+            return url.searchParams.get(name);
+        }
+        const tableId = getQueryParam('table');
+        const baseId = getQueryParam('base');
+        const statusDiv = document.getElementById('status');
+        const fieldSelect = document.getElementById('fieldSelect');
+        const valueSelect = document.getElementById('valueSelect');
+        let records = [];
+        if (!tableId || !baseId) {
+            statusDiv.textContent = 'Missing table or base in query string.';
+        } else {
+            // Try cache first
+            const cacheKey = 'airtable_data_' + tableId;
+            let cached = localStorage.getItem(cacheKey);
+            if (cached) {
+                try {
+                    const parsed = JSON.parse(cached);
+                    if (parsed && parsed.records) {
+                        records = parsed.records;
+                        statusDiv.textContent = `Loaded ${records.length} records from cache.`;
+                        populateFields(records);
+                    }
+                } catch (e) {}
+            }
+            // Always fetch fresh data in background
+            const apiKey = localStorage.getItem('airtableApiKey');
+            if (apiKey) {
+                fetch(`https://api.airtable.com/v0/${baseId}/${tableId}?pageSize=100`, {
+                    headers: { 'Authorization': 'Bearer ' + apiKey }
+                })
+                .then(async response => {
+                    if (!response.ok) return;
+                    return response.json();
+                })
+                .then(data => {
+                    if (data && data.records) {
+                        records = data.records;
+                        statusDiv.textContent = `Loaded ${records.length} records from API.`;
+                        localStorage.setItem(cacheKey, JSON.stringify({ records: data.records, lastWritten: Date.now() }));
+                        populateFields(records);
+                    }
+                });
+            }
+        }
+        function populateFields(records) {
+            // Get all unique field names
+            const fieldNames = new Set();
+            records.forEach(r => Object.keys(r.fields).forEach(f => fieldNames.add(f)));
+            fieldSelect.innerHTML = '<option value="">-- Select a field --</option>';
+            let foundDefault = false;
+            Array.from(fieldNames).forEach(f => {
+                const opt = document.createElement('option');
+                opt.value = f;
+                opt.textContent = f;
+                if (f === 'This month is ... ') {
+                    opt.selected = true;
+                    foundDefault = true;
+                }
+                fieldSelect.appendChild(opt);
+            });
+            // If default was found, trigger onchange to populate values
+            if (foundDefault) {
+                fieldSelect.onchange();
+            }
+        }
+        fieldSelect.onchange = function() {
+            valueSelect.innerHTML = '<option value="">-- Select a value --</option>';
+            document.getElementById('filteredResults').innerHTML = '';
+            if (!fieldSelect.value) return;
+            // Get all unique values for this field
+            const values = new Set();
+            records.forEach(r => {
+                if (r.fields[fieldSelect.value] !== undefined) {
+                    values.add(r.fields[fieldSelect.value]);
+                }
+            });
+            Array.from(values).forEach(v => {
+                const opt = document.createElement('option');
+                opt.value = v;
+                opt.textContent = v;
+                valueSelect.appendChild(opt);
+            });
+        // removed stray closing brace after refactor
+
+        function renderFilteredResults() {
+            document.getElementById('filteredResults').innerHTML = '';
+            const summary = document.getElementById('filterSummary');
+            if (fieldSelect.value && valueSelect.value) {
+                summary.textContent = fieldSelect.value + ' ' + valueSelect.value;
+            } else {
+                summary.textContent = '';
+            }
+            if (!fieldSelect.value || !valueSelect.value || !templateSelect.value) return;
+            // Filter records
+            const filtered = records.filter(r => r.fields[fieldSelect.value] == valueSelect.value);
+            if (!filtered.length) {
+                document.getElementById('filteredResults').innerHTML = '<em>No records found for this filter.</em>';
+                return;
+            }
+            // Sort filtered records by Name (alpha order)
+            filtered.sort((a, b) => {
+                const nameA = (a.fields['Name'] || '').toUpperCase();
+                const nameB = (b.fields['Name'] || '').toUpperCase();
+                if (nameA < nameB) return -1;
+                if (nameA > nameB) return 1;
+                return 0;
+            });
+            // Load the selected template file based on dropdown value
+            const templateFile = templateSelect.value.charAt(0).toUpperCase() + templateSelect.value.slice(1) + '.html';
+            fetch(templateFile)
+                .then(resp => resp.text())
+                .then(template => {
+                    let html = '';
+                    filtered.forEach(record => {
+                        // Replace all {{fields.FIELDNAME}} and {{fields."FIELD NAME"}} with the corresponding value from record.fields
+                        let rendered = template.replace(/{{\s*fields\.(?:"([^"]+)"|([a-zA-Z0-9_ -]+))\s*}}/g, (match, quoted, unquoted) => {
+                            const key = quoted !== undefined ? quoted : unquoted;
+                            let val = record.fields[key];
+                            if (val === undefined || val === null) return '';
+                            // Replace newlines with <br>
+                            return String(val).replace(/\r?\n/g, '<br>');
+                        });
+                        html += rendered;
+                    });
+                    document.getElementById('filteredResults').innerHTML = html;
+                });
+        }
+
+        valueSelect.onchange = renderFilteredResults;
+        templateSelect.onchange = renderFilteredResults;
+        };
+    </script>
+</body>
+</html>

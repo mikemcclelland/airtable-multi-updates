@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Airtable Table Data</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        body { max-width: 900px; margin: 40px auto; font-family: sans-serif; }
+        .container { background: #fff; padding: 2em; border-radius: 8px; box-shadow: 0 2px 8px #0001; }
+        h1 { margin-top: 0; }
+        table { border-collapse: collapse; width: 100%; margin-top: 1em; }
+        th, td { border: 1px solid #eee; padding: 0.5em; text-align: left; }
+        th { background: #f7f7f7; }
+        .error { color: #ff4136; margin-top: 1em; }
+        .loading { color: #0074d9; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 id="title">Airtable Table Data</h1>
+        <div id="status" class="loading">Loading...</div>
+        <div id="dataTableContainer"></div>
+        <div style="margin-top:2em;">
+            <a href="tables.html">Back to Tables</a>
+        </div>
+    </div>
+    <script>
+        function getQueryParam(name) {
+            const url = new URL(window.location.href);
+            return url.searchParams.get(name);
+        }
+        const tableId = getQueryParam('table');
+        const statusDiv = document.getElementById('status');
+        const dataTableContainer = document.getElementById('dataTableContainer');
+        const apiKey = localStorage.getItem('airtableApiKey');
+        const baseId = getQueryParam('base');
+        const cacheKey = 'airtable_data_' + tableId;
+        function renderTable(records) {
+            if (!records || !records.length) {
+                statusDiv.textContent = 'No data found in this table.';
+                statusDiv.className = '';
+                return;
+            }
+            statusDiv.style.display = 'none';
+            // Get all field names from the first record
+            const fields = Object.keys(records[0].fields);
+            let html = '<table><thead><tr>';
+            fields.forEach(f => { html += `<th>${f}</th>`; });
+            html += '</tr></thead><tbody>';
+            records.forEach(record => {
+                html += '<tr>';
+                fields.forEach(f => {
+                    html += `<td>${record.fields[f] !== undefined ? record.fields[f] : ''}</td>`;
+                });
+                html += '</tr>';
+            });
+            html += '</tbody></table>';
+            dataTableContainer.innerHTML = html;
+        }
+
+        if (!tableId) {
+            statusDiv.textContent = 'No table specified in the query string.';
+            statusDiv.className = 'error';
+        } else if (!apiKey) {
+            statusDiv.textContent = 'No API key found. Please set it in the config page.';
+            statusDiv.className = 'error';
+        } else if (!baseId) {
+            statusDiv.textContent = 'No base specified in the query string.';
+            statusDiv.className = 'error';
+        } else {
+            // Try to read from cache first
+            let cached = localStorage.getItem(cacheKey);
+            if (cached) {
+                try {
+                    const parsed = JSON.parse(cached);
+                    if (parsed && parsed.records && parsed.lastWritten) {
+                        statusDiv.textContent = `Loaded from cache (last written: ${new Date(parsed.lastWritten).toLocaleString()})`;
+                        statusDiv.className = 'loading';
+                        renderTable(parsed.records);
+                    }
+                } catch (e) { /* ignore parse errors */ }
+            }
+            // Always fetch fresh data in the background
+            statusDiv.textContent = 'Loading data...';
+            statusDiv.className = 'loading';
+            fetch(`https://api.airtable.com/v0/${baseId}/${tableId}?pageSize=100`, {
+                headers: { 'Authorization': 'Bearer ' + apiKey }
+            })
+            .then(async response => {
+                if (!response.ok) {
+                    const err = await response.json().catch(() => ({}));
+                    statusDiv.textContent = 'Error: ' + (err.error ? err.error.message : 'Could not fetch data.');
+                    statusDiv.className = 'error';
+                    return;
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (!data || !data.records || !data.records.length) {
+                    statusDiv.textContent = 'No data found in this table.';
+                    statusDiv.className = '';
+                    return;
+                }
+                // Update cache
+                localStorage.setItem(cacheKey, JSON.stringify({
+                    records: data.records,
+                    lastWritten: Date.now()
+                }));
+                statusDiv.textContent = `Loaded from API (last written: ${new Date().toLocaleString()})`;
+                statusDiv.className = 'loading';
+                renderTable(data.records);
+            })
+            .catch(() => {
+                statusDiv.textContent = 'Network error.';
+                statusDiv.className = 'error';
+            });
+        }
+    </script>
+</body>
+</html>

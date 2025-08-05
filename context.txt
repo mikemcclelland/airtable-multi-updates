@@ -1,0 +1,18 @@
+This is a project that reads Airtable data using their API.
+
+My logical organisation is:
+- I ask my TIGER 21 members each month for a World Update.
+- I use an Airtable form to capture this data.
+- They complete the form.
+- I duplicate the form (but not the 'base') every month and generally ask the same questions (the top section of the form)
+- This form includes what I call a 'check-in', which includes single-select fields for: Health, Sleep, Business, Relationships, Spirituality, Investments
+- Members provide their name in a free form text field, but it should be entered consistently.
+- Not all members complete the form, so there will be missing months that we will need to account for.
+- The members complete their form but I limit what they can enter by using a field to indicate the update month.
+
+Most of the code needed is already in the files in this project.
+
+I want to write a simple tool will first:
+1. Allow the user to enter his API key, which will be saved in the user's local browser storage (with a reset button). This will be in a new page called config.html.
+2. Create a page that will list all the bases.
+3. Create a cache of all the data in all the tables that are in all the bases. This should be kept in a local json file.

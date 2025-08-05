@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>World Update Tables</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        body { max-width: 600px; margin: 40px auto; font-family: sans-serif; }
+        .container { background: #fff; padding: 2em; border-radius: 8px; box-shadow: 0 2px 8px #0001; }
+        h1 { margin-top: 0; }
+        ul { list-style: none; padding: 0; }
+        li { padding: 0.75em 0; border-bottom: 1px solid #eee; }
+        .links { margin-top: 2em; }
+        .links a { margin-right: 1.5em; color: #0074d9; text-decoration: none; font-weight: bold; }
+        .links a:hover { text-decoration: underline; }
+    </style>
+    <script>
+        function getQueryParam(name) {
+            const url = new URL(window.location.href);
+            return url.searchParams.get(name);
+        }
+        document.addEventListener('DOMContentLoaded', function () {
+            const baseId = getQueryParam('base');
+            const h1Title = document.getElementById('h1Title');
+            const tablesList = document.getElementById('tables-list');
+            if (!baseId) {
+                h1Title.textContent = 'No base specified in the query string.';
+                return;
+            }
+            const apiKey = localStorage.getItem('airtableApiKey');
+            if (!apiKey) {
+                h1Title.textContent = 'No API key found. Please set it in the config page.';
+                return;
+            }
+            // Try to read from cache first
+            const cacheKey = 'airtable_tables_' + baseId;
+            let cached = localStorage.getItem(cacheKey);
+            if (cached) {
+                try {
+                    const data = JSON.parse(cached);
+                    if (data && data.tables && data.tables.length) {
+                        h1Title.textContent = `Tables in Base: ${baseId} (cached)`;
+                        renderTables(data.tables, baseId, tablesList);
+                    }
+                } catch (e) { /* ignore parse errors */ }
+            }
+            // Always fetch fresh data in the background
+            h1Title.textContent = 'Loading tables...';
+            fetch(`https://api.airtable.com/v0/meta/bases/${baseId}/tables`, {
+                headers: { 'Authorization': 'Bearer ' + apiKey }
+            })
+                .then(async response => {
+                    if (!response.ok) {
+                        const err = await response.json().catch(() => ({}));
+                        h1Title.textContent = 'Error: ' + (err.error ? err.error.message : 'Could not fetch tables.');
+                        return;
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (!data || !data.tables || !data.tables.length) {
+                        h1Title.textContent = 'No tables found in this base.';
+                        return;
+                    }
+                    h1Title.textContent = `Tables in Base: ${baseId}`;
+                    // Update cache
+                    localStorage.setItem(cacheKey, JSON.stringify(data));
+                    // Clear and render
+                    tablesList.innerHTML = '';
+                    renderTables(data.tables, baseId, tablesList);
+                })
+                .catch(() => {
+                    h1Title.textContent = 'Network error.';
+                });
+
+            function renderTables(tables, baseId, tablesList) {
+                tables.forEach(table => {
+                    const li = document.createElement('li');
+                    // Table name as plain text
+                    const nameSpan = document.createElement('span');
+                    nameSpan.textContent = table.name;
+                    nameSpan.style.fontWeight = 'bold';
+                    li.appendChild(nameSpan);
+                    // All Data button
+                    const allDataBtn = document.createElement('a');
+                    allDataBtn.href = `data.html?base=${encodeURIComponent(baseId)}&table=${encodeURIComponent(table.id)}`;
+                    allDataBtn.textContent = 'All Data';
+                    allDataBtn.style.marginLeft = '1.5em';
+                    allDataBtn.style.padding = '0.25em 1em';
+                    allDataBtn.style.background = '#0074d9';
+                    allDataBtn.style.color = '#fff';
+                    allDataBtn.style.borderRadius = '4px';
+                    allDataBtn.style.textDecoration = 'none';
+                    allDataBtn.style.fontSize = '0.95em';
+                    allDataBtn.style.fontWeight = 'bold';
+                    allDataBtn.style.transition = 'background 0.2s';
+                    allDataBtn.onmouseover = function() { allDataBtn.style.background = '#005fa3'; };
+                    allDataBtn.onmouseout = function() { allDataBtn.style.background = '#0074d9'; };
+                    li.appendChild(allDataBtn);
+                    // Filtered Data button
+                    const filterBtn = document.createElement('a');
+                    filterBtn.href = `filtered_data.html?base=${encodeURIComponent(baseId)}&table=${encodeURIComponent(table.id)}`;
+                    filterBtn.textContent = 'Filtered Data';
+                    filterBtn.style.marginLeft = '0.75em';
+                    filterBtn.style.padding = '0.25em 1em';
+                    filterBtn.style.background = '#2ecc40';
+                    filterBtn.style.color = '#fff';
+                    filterBtn.style.borderRadius = '4px';
+                    filterBtn.style.textDecoration = 'none';
+                    filterBtn.style.fontSize = '0.95em';
+                    filterBtn.style.fontWeight = 'bold';
+                    filterBtn.style.transition = 'background 0.2s';
+                    filterBtn.onmouseover = function() { filterBtn.style.background = '#219a36'; };
+                    filterBtn.onmouseout = function() { filterBtn.style.background = '#2ecc40'; };
+                    li.appendChild(filterBtn);
+                    // Show table ID in smaller font
+                    const idSpan = document.createElement('span');
+                    idSpan.textContent = ` (${table.id})`;
+                    idSpan.style.color = '#888';
+                    idSpan.style.fontSize = '0.9em';
+                    li.appendChild(idSpan);
+                    tablesList.appendChild(li);
+                });
+            }
+        });
+    </script>
+</head>
+
+<body>
+    <div class="container">
+        <h1 id="h1Title">Airtable Tables</h1>
+        <ul id="tables-list"></ul>
+        <div class="links">
+            <a href="bases.html">Back to Bases</a>
+            <a href="config.html">Config</a>
+            <a href="status.html">Status</a>
+        </div>
+    </div>
+</body>
+
+</html>

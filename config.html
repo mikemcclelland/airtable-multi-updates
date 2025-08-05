@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Config - Airtable API Key</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        body { max-width: 400px; margin: 40px auto; font-family: sans-serif; }
+        .container { background: #fff; padding: 2em; border-radius: 8px; box-shadow: 0 2px 8px #0001; }
+        label { display: block; margin-bottom: 0.5em; font-weight: bold; }
+        input[type="text"] { width: 100%; padding: 0.5em; margin-bottom: 1em; border: 1px solid #ccc; border-radius: 4px; }
+        button { padding: 0.5em 1.5em; border: none; border-radius: 4px; background: #0074d9; color: #fff; font-weight: bold; cursor: pointer; margin-right: 1em; }
+        button.reset { background: #ff4136; }
+        .status { margin-top: 1em; color: #2ecc40; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Configure Airtable API Key</h2>
+        <label for="apiKey">Airtable API Key</label>
+        <input type="text" id="apiKey" placeholder="Enter your API key here" autocomplete="off">
+        <div>
+            <button id="saveBtn">Save</button>
+            <button id="validateBtn" style="background:#2ecc40;">Validate</button>
+            <button id="resetBtn" class="reset">Reset</button>
+        </div>
+        <div class="status" id="status"></div>
+    </div>
+    <script>
+        const apiKeyInput = document.getElementById('apiKey');
+        const statusDiv = document.getElementById('status');
+        // Load API key from localStorage
+        window.onload = function() {
+            const savedKey = localStorage.getItem('airtableApiKey');
+            if (savedKey) {
+                apiKeyInput.value = savedKey;
+                statusDiv.textContent = 'API key loaded.';
+            }
+        };
+        // Save API key
+        document.getElementById('saveBtn').onclick = function() {
+            const key = apiKeyInput.value.trim();
+            if (key) {
+                localStorage.setItem('airtableApiKey', key);
+                statusDiv.textContent = 'API key saved!';
+            } else {
+                statusDiv.textContent = 'Please enter a valid API key.';
+            }
+        };
+
+        // Validate API key
+        document.getElementById('validateBtn').onclick = async function() {
+            const key = apiKeyInput.value.trim();
+            if (!key) {
+                statusDiv.textContent = 'Please enter an API key to validate.';
+                return;
+            }
+            statusDiv.textContent = 'Validating...';
+            try {
+                const response = await fetch('https://api.airtable.com/v0/meta/bases', {
+                    headers: { 'Authorization': 'Bearer ' + key }
+                });
+                if (response.ok) {
+                    statusDiv.textContent = 'API key is valid!';
+                } else {
+                    const err = await response.json().catch(() => ({}));
+                    statusDiv.textContent = 'Invalid API key. ' + (err.error ? err.error.message : '');
+                }
+            } catch (e) {
+                statusDiv.textContent = 'Network error or invalid key.';
+            }
+        };
+
+        // Reset API key
+        document.getElementById('resetBtn').onclick = function() {
+            localStorage.removeItem('airtableApiKey');
+            apiKeyInput.value = '';
+            statusDiv.textContent = 'API key reset.';
+        };
+    </script>
+    <hr style="margin:2em 0;">
+    <h2>Display Templates on Server</h2>
+    <div id="templateList"></div>
+    <div style="margin-top:2em; text-align:center;">
+        <a href="bases.html">&larr; Back to Bases</a>
+    </div>
+    <script>
+    // Template file data (injected by build or server, here hardcoded for static demo)
+    const templateFiles = [
+      {
+        name: 'template_notes.html',
+        content: `<h2>{{fields.Name}}</h2>\n<div>{{fields.Notes}}</div>\n`
+      },
+      {
+        name: 'template_recommendations.html',
+        content: `<h2>{{fields.Name}}</h2>\n<div>{{fields.\"Recommendations - e.g. an advisor, service, product, book, play, investment, activity, experience, etc.\"}}</div>\n`
+      },
+      {
+        name: 'template_issuesandopps.html',
+        content: `<h2>{{fields.Name}}</h2>\n<div>{{fields.\"Issues & Opportunities & Topics\"}}</div>\n`
+      }
+    ];
+    const templateListDiv = document.getElementById('templateList');
+    templateFiles.forEach(tpl => {
+      const section = document.createElement('section');
+      section.style.marginBottom = '1em';
+      const titleDiv = document.createElement('div');
+      titleDiv.style.display = 'flex';
+      titleDiv.style.alignItems = 'center';
+      const btn = document.createElement('button');
+      btn.textContent = 'Show';
+      btn.style.marginRight = '1em';
+      btn.style.fontSize = '0.9em';
+      btn.style.padding = '0.2em 1em';
+      btn.style.cursor = 'pointer';
+      const strong = document.createElement('strong');
+      strong.style.color = '#2e8b57';
+      strong.textContent = tpl.name;
+      titleDiv.appendChild(btn);
+      titleDiv.appendChild(strong);
+      section.appendChild(titleDiv);
+      const pre = document.createElement('pre');
+      pre.style.background = '#f8f8f8';
+      pre.style.padding = '1em';
+      pre.style.overflow = 'auto';
+      pre.style.display = 'none';
+      pre.textContent = tpl.content;
+      section.appendChild(pre);
+      btn.onclick = function() {
+        if (pre.style.display === 'none') {
+          pre.style.display = 'block';
+          btn.textContent = 'Hide';
+        } else {
+          pre.style.display = 'none';
+          btn.textContent = 'Show';
+        }
+      };
+      templateListDiv.appendChild(section);
+    });
+    </script>
+</body>
+</html>

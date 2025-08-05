@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Airtable Bases</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        body { max-width: 600px; margin: 40px auto; font-family: sans-serif; }
+        .container { background: #fff; padding: 2em; border-radius: 8px; box-shadow: 0 2px 8px #0001; }
+        h1 { margin-top: 0; }
+        ul { list-style: none; padding: 0; }
+        li { padding: 0.75em 0; border-bottom: 1px solid #eee; }
+        .links { margin-top: 2em; }
+        .links a { margin-right: 1.5em; color: #0074d9; text-decoration: none; font-weight: bold; }
+        .links a:hover { text-decoration: underline; }
+    </style>
+    <script>
+        // Save selected base ID to localStorage
+        function saveAppId(appId) {
+            localStorage.setItem('selectedAppId', appId);
+        }
+
+        document.addEventListener('DOMContentLoaded', function () {
+            const recordsList = document.getElementById('bases-list');
+            const h1Title = document.getElementById('h1Title');
+            // Get API key from localStorage (set by config.html)
+            const apiKey = localStorage.getItem('airtableApiKey');
+            if (!apiKey) {
+                h1Title.textContent = 'No API key found.';
+                const li = document.createElement('li');
+                li.textContent = 'Please set your API key in the config page.';
+                recordsList.appendChild(li);
+                return;
+            }
+            h1Title.textContent = 'Loading bases...';
+            fetch('https://api.airtable.com/v0/meta/bases', {
+                headers: { 'Authorization': 'Bearer ' + apiKey }
+            })
+                .then(async response => {
+                    if (!response.ok) {
+                        const err = await response.json().catch(() => ({}));
+                        h1Title.textContent = 'Error loading bases';
+                        const li = document.createElement('li');
+                        li.textContent = err.error ? err.error.message : 'Could not fetch bases.';
+                        li.style.color = '#ff4136';
+                        recordsList.appendChild(li);
+                        return;
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (!data || !data.bases || !data.bases.length) {
+                        h1Title.textContent = 'No bases found.';
+                        return;
+                    }
+                    h1Title.textContent = 'World Update Bases';
+                    // Optionally sort bases alphabetically
+                    data.bases.sort((a, b) => a.name.localeCompare(b.name));
+                    const thisAppId = localStorage.getItem('selectedAppId');
+                    data.bases.forEach(base => {
+                        const recordId = base.id;
+                        const recordName = base.name;
+                        const listItem = document.createElement('li');
+                        // Always make the base name a link to tables.html?base=BASE_ID
+                        const item = document.createElement('a');
+                        item.setAttribute('href', 'tables.html?base=' + encodeURIComponent(recordId));
+                        item.textContent = recordName + (recordId === thisAppId ? ' (selected)' : '');
+                        if (recordId === thisAppId) {
+                            item.style.fontWeight = 'bold';
+                        }
+                        listItem.appendChild(item);
+                        // Show base ID in smaller font
+                        const idSpan = document.createElement('span');
+                        idSpan.textContent = ' (' + recordId + ')';
+                        idSpan.style.color = '#888';
+                        idSpan.style.fontSize = '0.9em';
+                        listItem.appendChild(idSpan);
+                        recordsList.appendChild(listItem);
+                    });
+                })
+                .catch(() => {
+                    h1Title.textContent = 'Network error.';
+                    const li = document.createElement('li');
+                    li.textContent = 'Could not connect to Airtable.';
+                    li.style.color = '#ff4136';
+                    recordsList.appendChild(li);
+                });
+        });
+    </script>
+</head>
+
+<body>
+    <div class="container">
+        <h1 id="h1Title">World Update Bases</h1>
+        <ul id="bases-list"></ul>
+        <div class="links">
+            <a href="config.html">Config</a>
+            <a href="status.html">Status</a>
+            <a href="https://airtable.com/create/tokens" target="_blank">Get API Token</a>
+        </div>
+    </div>
+</body>
+
+</html>

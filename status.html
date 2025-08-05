@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Cache Status</title>
+    <link rel="stylesheet" href="styles.css">
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const statusDiv = document.getElementById('status');
+            const resetBtn = document.getElementById('reset-cache');
+            const resetAirtableBtn = document.getElementById('reset-airtable-cache');
+            const refreshBtn = document.getElementById('refresh-cache');
+            function renderCache() {
+                statusDiv.innerHTML = '';
+                // --- Display Template Section ---
+                let templateCount = 0;
+                for (let i = 0; i < localStorage.length; i++) {
+                    const key = localStorage.key(i);
+                    if (key.startsWith('template_')) templateCount++;
+                }
+                if (templateCount > 0) {
+                    const templateHeader = document.createElement('h2');
+                    templateHeader.textContent = 'Display Templates';
+                    templateHeader.style.marginTop = '0';
+                    statusDiv.appendChild(templateHeader);
+                    for (let i = 0; i < localStorage.length; i++) {
+                        const key = localStorage.key(i);
+                        if (!key.startsWith('template_')) continue;
+                        const value = localStorage.getItem(key);
+                        const section = document.createElement('section');
+                        section.style.marginBottom = '1em';
+                        // Title row with show/hide button
+                        const titleDiv = document.createElement('div');
+                        titleDiv.style.display = 'flex';
+                        titleDiv.style.alignItems = 'center';
+                        const btn = document.createElement('button');
+                        btn.textContent = 'Show';
+                        btn.style.marginRight = '1em';
+                        btn.style.fontSize = '0.9em';
+                        btn.style.padding = '0.2em 1em';
+                        btn.style.cursor = 'pointer';
+                        const strong = document.createElement('strong');
+                        strong.style.color = '#2e8b57';
+                        strong.textContent = key;
+                        titleDiv.appendChild(btn);
+                        titleDiv.appendChild(strong);
+                        section.appendChild(titleDiv);
+                        // Data block, hidden by default
+                        const pre = document.createElement('pre');
+                        pre.style.background = '#f8f8f8';
+                        pre.style.padding = '1em';
+                        pre.style.overflow = 'auto';
+                        pre.style.display = 'none';
+                        pre.textContent = value;
+                        section.appendChild(pre);
+                        btn.onclick = function() {
+                            if (pre.style.display === 'none') {
+                                pre.style.display = 'block';
+                                btn.textContent = 'Hide';
+                            } else {
+                                pre.style.display = 'none';
+                                btn.textContent = 'Show';
+                            }
+                        };
+                        statusDiv.appendChild(section);
+                    }
+                    // Divider
+                    const hr = document.createElement('hr');
+                    hr.style.margin = '2em 0';
+                    statusDiv.appendChild(hr);
+                }
+                // --- Regular Cache Section ---
+                let found = false;
+                for (let i = 0; i < localStorage.length; i++) {
+                    const key = localStorage.key(i);
+                    if (key.startsWith('template_')) continue;
+                    const value = localStorage.getItem(key);
+                    let displayValue = value;
+                    try {
+                        const parsed = JSON.parse(value);
+                        displayValue = JSON.stringify(parsed, null, 2);
+                    } catch (e) {}
+                    const section = document.createElement('section');
+                    section.style.marginBottom = '1em';
+                    // Title row with show/hide button
+                    const titleDiv = document.createElement('div');
+                    titleDiv.style.display = 'flex';
+                    titleDiv.style.alignItems = 'center';
+                    const btn = document.createElement('button');
+                    btn.textContent = 'Show';
+                    btn.style.marginRight = '1em';
+                    btn.style.fontSize = '0.9em';
+                    btn.style.padding = '0.2em 1em';
+                    btn.style.cursor = 'pointer';
+                    const strong = document.createElement('strong');
+                    if (key.startsWith('airtable_tables_')) {
+                        strong.style.color = '#0074d9';
+                    }
+                    strong.textContent = key;
+                    titleDiv.appendChild(btn);
+                    titleDiv.appendChild(strong);
+                    section.appendChild(titleDiv);
+                    // Data block, hidden by default
+                    const pre = document.createElement('pre');
+                    pre.style.background = '#f8f8f8';
+                    pre.style.padding = '1em';
+                    pre.style.overflow = 'auto';
+                    pre.style.display = 'none';
+                    pre.textContent = displayValue;
+                    section.appendChild(pre);
+                    btn.onclick = function() {
+                        if (pre.style.display === 'none') {
+                            pre.style.display = 'block';
+                            btn.textContent = 'Hide';
+                        } else {
+                            pre.style.display = 'none';
+                            btn.textContent = 'Show';
+                        }
+                    };
+                    statusDiv.appendChild(section);
+                    found = true;
+                }
+                if (!found) {
+                    statusDiv.innerHTML += '<em>No cache data found in localStorage.</em>';
+                }
+            }
+            renderCache();
+            resetBtn.onclick = function() {
+                if (confirm('Are you sure you want to clear all cache data?')) {
+                    localStorage.clear();
+                    renderCache();
+                }
+            };
+            resetAirtableBtn.onclick = function() {
+                if (confirm('Clear only Airtable tables cache?')) {
+                    // Remove only keys starting with 'airtable_tables_'
+                    const keysToRemove = [];
+                    for (let i = 0; i < localStorage.length; i++) {
+                        const key = localStorage.key(i);
+                        if (key.startsWith('airtable_tables_')) {
+                            keysToRemove.push(key);
+                        }
+                    }
+                    keysToRemove.forEach(key => localStorage.removeItem(key));
+                    renderCache();
+                }
+            };
+            refreshBtn.onclick = function() {
+                renderCache();
+            };
+        });
+    </script>
+</head>
+<body>
+    <h1>Cache Status</h1>
+    <button id="reset-cache">Reset All Cache</button>
+    <button id="reset-airtable-cache">Reset Airtable Tables Cache</button>
+    <button id="refresh-cache">Refresh Cache Display</button>
+    <div id="status" style="margin-top:2em;"></div>
+    <div style="margin-top:2em; text-align:center;">
+        <a href="bases.html">&larr; Back to Bases</a>
+    </div>
+</body>
+</html>
