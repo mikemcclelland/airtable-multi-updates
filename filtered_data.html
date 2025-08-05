@@ -43,7 +43,7 @@
                 <option value="">-- Select a value --</option>
             </select>
         </div>
-        <h1 id="filterSummary" ></h1>
+        <h1 id="filterSummary" style="cursor:pointer;" title="Click to edit"></h1>
         <div id="filteredResults"></div>
         <div class="links print-hide">
             <a href="bases.html">Back to Bases</a>
@@ -139,14 +139,24 @@
             });
         // removed stray closing brace after refactor
 
+        let customSummary = null;
+        function setFilterSummary(text) {
+            const summary = document.getElementById('filterSummary');
+            summary.textContent = text;
+        }
         function renderFilteredResults() {
             document.getElementById('filteredResults').innerHTML = '';
             const summary = document.getElementById('filterSummary');
+            let defaultText = '';
             if (fieldSelect.value && valueSelect.value) {
-                summary.textContent = fieldSelect.value + ' ' + valueSelect.value;
-            } else {
-                summary.textContent = '';
+                defaultText = valueSelect.value;
             }
+            if (customSummary !== null) {
+                summary.textContent = customSummary;
+            } else {
+                summary.textContent = defaultText;
+            }
+            summary.title = "Click to edit";
             if (!fieldSelect.value || !valueSelect.value || !templateSelect.value) return;
             // Filter records
             const filtered = records.filter(r => r.fields[fieldSelect.value] == valueSelect.value);
@@ -154,14 +164,56 @@
                 document.getElementById('filteredResults').innerHTML = '<em>No records found for this filter.</em>';
                 return;
             }
-            // Sort filtered records by Name (alpha order)
-            filtered.sort((a, b) => {
-                const nameA = (a.fields['Name'] || '').toUpperCase();
-                const nameB = (b.fields['Name'] || '').toUpperCase();
-                if (nameA < nameB) return -1;
-                if (nameA > nameB) return 1;
-                return 0;
-            });
+            // Sort logic
+            if (templateSelect.value.endsWith('-month')) {
+                // Sort by 'This month is ...' field, reverse chrono
+                const monthField = 'This month is ... ';
+                const parseMonthYear = (str) => {
+                    if (!str) return new Date(0);
+                    // Normalize month names
+                    const months = {
+                        jan: 0, january: 0,
+                        feb: 1, february: 1,
+                        mar: 2, march: 2,
+                        apr: 3, april: 3,
+                        may: 4,
+                        jun: 5, june: 5,
+                        jul: 6, july: 6,
+                        aug: 7, august: 7,
+                        sep: 8, sept: 8, september: 8,
+                        oct: 9, october: 9,
+                        nov: 10, november: 10,
+                        dec: 11, december: 11
+                    };
+                    const parts = str.trim().split(/\s+/);
+                    if (parts.length < 2) return new Date(0);
+                    let monthStr = parts[0].toLowerCase();
+                    let yearStr = parts[1];
+                    // Handle cases like 'Sept 2025' or 'September 2025'
+                    if (months[monthStr] === undefined && parts.length > 2) {
+                        monthStr = (parts[0] + ' ' + parts[1]).toLowerCase();
+                        yearStr = parts[2];
+                    }
+                    const month = months[monthStr];
+                    const year = parseInt(yearStr, 10);
+                    if (month === undefined || isNaN(year)) return new Date(0);
+                    return new Date(year, month, 1);
+                };
+                filtered.sort((a, b) => {
+                    const dateA = parseMonthYear(a.fields[monthField]);
+                    const dateB = parseMonthYear(b.fields[monthField]);
+                    return dateB - dateA; // reverse chrono
+                });
+            } else {
+                // Sort filtered records by Name (alpha order)
+                filtered.sort((a, b) => {
+                    const nameA = (a.fields['Name'] || '').toUpperCase();
+                    const nameB = (b.fields['Name'] || '').toUpperCase();
+                    if (nameA < nameB) return -1;
+                    if (nameA > nameB) return 1;
+                    return 0;
+                });
+            }
             // Load the selected template file based on dropdown value
             const templateFile = templateSelect.value + '.html';
             fetch(templateFile)
@@ -185,6 +237,59 @@
 
         valueSelect.onchange = renderFilteredResults;
         templateSelect.onchange = renderFilteredResults;
+
+        // Editable filterSummary logic
+        const summary = document.getElementById('filterSummary');
+        summary.addEventListener('click', function() {
+            if (document.getElementById('filterSummaryInput')) return; // already editing
+            const currentText = summary.textContent;
+            summary.innerHTML = '';
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.value = currentText;
+            input.id = 'filterSummaryInput';
+            input.style.fontSize = '1.2em';
+            input.style.width = '60%';
+            input.style.marginRight = '1em';
+            const saveBtn = document.createElement('button');
+            saveBtn.textContent = 'Save';
+            saveBtn.style.marginRight = '0.5em';
+            const cancelBtn = document.createElement('button');
+            cancelBtn.textContent = 'Cancel';
+            cancelBtn.style.marginRight = '0.5em';
+            const resetBtn = document.createElement('button');
+            resetBtn.textContent = 'Reset';
+            summary.appendChild(input);
+            summary.appendChild(saveBtn);
+            summary.appendChild(cancelBtn);
+            summary.appendChild(resetBtn);
+            input.focus();
+            saveBtn.onclick = function(e) {
+                e.stopPropagation();
+                customSummary = input.value;
+                setFilterSummary(customSummary);
+            };
+            cancelBtn.onclick = function(e) {
+                e.stopPropagation();
+                if (customSummary !== null) {
+                    setFilterSummary(customSummary);
+                } else {
+                    setFilterSummary(defaultText);
+                }
+            };
+            resetBtn.onclick = function(e) {
+                e.stopPropagation();
+                customSummary = null;
+                setFilterSummary(defaultText);
+            };
+            input.onkeydown = function(e) {
+                if (e.key === 'Enter') {
+                    saveBtn.onclick(e);
+                } else if (e.key === 'Escape') {
+                    cancelBtn.onclick(e);
+                }
+            };
+        });
         };
     </script>
 </body>
