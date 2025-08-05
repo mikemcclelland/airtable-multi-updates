@@ -86,23 +86,14 @@
         <a href="bases.html">&larr; Back to Bases</a>
     </div>
     <script>
-    // Template file data (injected by build or server, here hardcoded for static demo)
+    // List of template filenames (update as needed)
     const templateFiles = [
-      {
-        name: 'template_notes.html',
-        content: `<h2>{{fields.Name}}</h2>\n<div>{{fields.Notes}}</div>\n`
-      },
-      {
-        name: 'template_recommendations.html',
-        content: `<h2>{{fields.Name}}</h2>\n<div>{{fields.\"Recommendations - e.g. an advisor, service, product, book, play, investment, activity, experience, etc.\"}}</div>\n`
-      },
-      {
-        name: 'template_issuesandopps.html',
-        content: `<h2>{{fields.Name}}</h2>\n<div>{{fields.\"Issues & Opportunities & Topics\"}}</div>\n`
-      }
+      'template_travel.html',
+      'template_recommendations.html',
+      'template_issuesandopps.html'
     ];
     const templateListDiv = document.getElementById('templateList');
-    templateFiles.forEach(tpl => {
+    templateFiles.forEach(filename => {
       const section = document.createElement('section');
       section.style.marginBottom = '1em';
       const titleDiv = document.createElement('div');
@@ -116,7 +107,7 @@
       btn.style.cursor = 'pointer';
       const strong = document.createElement('strong');
       strong.style.color = '#2e8b57';
-      strong.textContent = tpl.name;
+      strong.textContent = filename;
       titleDiv.appendChild(btn);
       titleDiv.appendChild(strong);
       section.appendChild(titleDiv);
@@ -125,10 +116,23 @@
       pre.style.padding = '1em';
       pre.style.overflow = 'auto';
       pre.style.display = 'none';
-      pre.textContent = tpl.content;
+      pre.textContent = '';
       section.appendChild(pre);
+      let loaded = false;
       btn.onclick = function() {
         if (pre.style.display === 'none') {
+          if (!loaded) {
+            pre.textContent = 'Loading...';
+            fetch(filename)
+              .then(resp => resp.ok ? resp.text() : 'Error loading template')
+              .then(text => {
+                pre.textContent = text;
+                loaded = true;
+              })
+              .catch(() => {
+                pre.textContent = 'Error loading template';
+              });
+          }
           pre.style.display = 'block';
           btn.textContent = 'Hide';
         } else {
