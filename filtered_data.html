@@ -161,7 +161,7 @@
                 return 0;
             });
             // Load the selected template file based on dropdown value
-            const templateFile = templateSelect.value.charAt(0).toUpperCase() + templateSelect.value.slice(1) + '.html';
+            const templateFile = templateSelect.value + '.html';
             fetch(templateFile)
                 .then(resp => resp.text())
                 .then(template => {
